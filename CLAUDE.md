@@ -48,7 +48,11 @@ O saldo devedor **não é armazenado** — é sempre calculado dinamicamente som
 
 ### IA vendedora (mock intencional)
 
-`app/services/ia_vendedora.py` é um mock por palavras-chave ("cardápio", "fiado") que consulta o banco real. O ponto de troca por um LLM de verdade é a função `processar_mensagem(telefone, mensagem, db) -> str` — o webhook em `routers/whatsapp.py` só delega para ela. O POST do webhook hoje aceita um payload simplificado (`{telefone, mensagem}`), não o formato real da Meta; o GET implementa a verificação padrão da Meta com `WHATSAPP_VERIFY_TOKEN`.
+`app/services/ia_vendedora.py` é um mock por palavras-chave ("cardápio", "fiado") que consulta o banco real. O ponto de troca por um LLM de verdade é a função `processar_mensagem(telefone, mensagem, db) -> str` — o webhook em `routers/whatsapp.py` só delega para ela. O POST do webhook aceita um payload simplificado (`{telefone, mensagem}` para texto; `tipo: "audio"` + `audio_url`/`audio_base64` para voz), não o formato real da Meta; o GET implementa a verificação padrão da Meta com `WHATSAPP_VERIFY_TOKEN`.
+
+### Transcrição de áudio
+
+`app/services/transcricao.py` transcreve áudios do WhatsApp em pt-BR via OpenAI (`whisper-1`, configurável). Pipeline em `processar_audio()`: baixa (URL ou base64) → converte com FFmpeg só se o formato não for aceito pela OpenAI (`.ogg` do WhatsApp é aceito direto) → transcreve → apaga temporários. Erros viram exceções (`ErroDownloadAudio`, `ErroTranscricao`, `ErroTranscricaoNaoConfigurada`) que o webhook converte em respostas amigáveis — áudio nunca derruba o bot. O texto transcrito entra no mesmo `processar_mensagem` do fluxo de texto. Requer `OPENAI_API_KEY` no `.env`.
 
 ### Logging
 

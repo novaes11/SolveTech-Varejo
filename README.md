@@ -38,6 +38,7 @@ O SolveTech Varejo é um MVP que resolve três dores do pequeno comerciante:
 | **Caderneta** | Cadastro de clientes, limite de fiado, saldo devedor dinâmico, histórico de movimentações |
 | **Webhook WhatsApp** | Endpoint para receber/verificar webhooks da Meta (GET + POST) |
 | **IA Vendedora** | Serviço mock que reconhece intenções ("cardápio", "fiado") e responde com dados reais do banco |
+| **Transcrição de Áudio** | Mensagens de voz do WhatsApp são transcritas (OpenAI, pt-BR) e seguem o mesmo fluxo do texto |
 | **Painel Admin** | Dashboard com gráficos, tela de estoque com busca e CRUD, caderneta com master-detail |
 | **Logging Colorido** | Logger customizado com cores ANSI para monitorar requisições, banco e IA no terminal |
 
@@ -238,7 +239,25 @@ npm run dev
 | Método | Rota | Descrição |
 |--------|------|-----------|
 | `GET` | `/api/whatsapp/webhook` | Verificação do webhook (Meta) |
-| `POST` | `/api/whatsapp/webhook` | Receber mensagem e processar com IA |
+| `POST` | `/api/whatsapp/webhook` | Receber mensagem (texto ou áudio) e processar com IA |
+
+**Mensagem de texto:**
+
+```json
+{ "telefone": "5511999990000", "mensagem": "cardápio" }
+```
+
+**Mensagem de áudio** (nota de voz) — envie `tipo: "audio"` com o arquivo via URL **ou** base64:
+
+```json
+{ "telefone": "5511999990000", "tipo": "audio", "audio_url": "https://.../voz.ogg" }
+```
+
+```json
+{ "telefone": "5511999990000", "tipo": "audio", "audio_base64": "<bytes em base64>", "audio_formato": "ogg" }
+```
+
+O áudio é transcrito em português (OpenAI Whisper) e o texto segue o mesmo fluxo da mensagem digitada. A resposta inclui o campo `transcricao`. Requer `OPENAI_API_KEY` configurada — sem ela, o bot responde avisando que o recurso não está habilitado. Formatos fora da lista aceita pela OpenAI (ex.: `.amr`) são convertidos com **FFmpeg**, se instalado.
 
 ---
 
@@ -304,11 +323,14 @@ O backend suporta configuração via arquivo `.env` na pasta `backend/`. Variáv
 |----------|--------|-----------|
 | `DATABASE_URL` | `sqlite:///solvetech.db` | URL de conexão do banco |
 | `WHATSAPP_VERIFY_TOKEN` | `solvetech-verify-token` | Token de verificação do webhook da Meta |
+| `OPENAI_API_KEY` | *(vazio)* | Chave da OpenAI — habilita a transcrição de áudios do WhatsApp |
+| `TRANSCRICAO_MODELO` | `whisper-1` | Modelo de transcrição de áudio da OpenAI |
 
 Exemplo de arquivo `backend/.env`:
 
 ```env
 WHATSAPP_VERIFY_TOKEN=meu-token-secreto
+OPENAI_API_KEY=sk-...
 ```
 
 ---

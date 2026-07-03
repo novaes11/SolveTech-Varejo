@@ -11,6 +11,11 @@ class Settings(BaseSettings):
     # O token do WhatsApp vai vir de variável de ambiente quando integrar de verdade
     WHATSAPP_VERIFY_TOKEN: str = "solvetech-verify-token"
 
+    # Transcrição de áudio (OpenAI) — sem a chave no .env, áudio responde
+    # com mensagem amigável avisando que o recurso não está habilitado
+    OPENAI_API_KEY: str = ""
+    TRANSCRICAO_MODELO: str = "whisper-1"
+
     class Config:
         env_file = ".env"
 
