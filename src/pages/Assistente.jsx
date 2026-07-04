@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatDateTime, formatTime } from '@/lib/format';
+import { toast } from '@/components/ui/use-toast';
 import { Send, Bot, Sparkles, CheckCircle2, Brain, Database, AlertTriangle, ShieldCheck, Mic, Square } from 'lucide-react';
 
 const exemplos = [
@@ -40,6 +41,10 @@ export default function Assistente() {
   const scrollRef = useRef(null);
   const recognitionRef = useRef(null);
   const baseTextRef = useRef('');
+  const inputRef = useRef('');
+  const stopRequestedRef = useRef(false);
+
+  useEffect(() => { inputRef.current = input; }, [input]);
 
   const speechSupported = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
 
@@ -49,31 +54,79 @@ export default function Assistente() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [eventos, sending]);
 
-  useEffect(() => () => { recognitionRef.current?.abort?.(); }, []);
+  useEffect(() => () => { stopRequestedRef.current = true; recognitionRef.current?.abort?.(); }, []);
 
-  const toggleMic = () => {
-    if (recording) {
-      recognitionRef.current?.stop();
-      return;
-    }
+  const pararMic = () => {
+    stopRequestedRef.current = true;
+    recognitionRef.current?.stop();
+    setRecording(false);
+  };
+
+  const iniciarReconhecimento = () => {
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SR) return;
     const rec = new SR();
     rec.lang = 'pt-BR';
     rec.interimResults = true;
     rec.continuous = true;
-    baseTextRef.current = input.trim();
     rec.onresult = (e) => {
       let texto = '';
       for (let i = 0; i < e.results.length; i++) texto += e.results[i][0].transcript;
       const base = baseTextRef.current;
       setInput((base ? `${base} ` : '') + texto.trim());
     };
-    rec.onend = () => setRecording(false);
-    rec.onerror = () => setRecording(false);
+    rec.onerror = (e) => {
+      if (e.error === 'aborted') return;
+      // 'no-speech' é rotineiro em pausas longas; o onend religa a escuta
+      if (e.error === 'no-speech') return;
+      stopRequestedRef.current = true;
+      setRecording(false);
+      const msgs = {
+        'not-allowed': 'Permita o acesso ao microfone no navegador para usar o comando de voz.',
+        'service-not-allowed': 'O navegador bloqueou o serviço de voz. Use o Chrome ou o Edge.',
+        'network': 'O serviço de reconhecimento de voz não respondeu. Verifique sua conexão e tente de novo.',
+        'audio-capture': 'Nenhum microfone foi encontrado neste dispositivo.',
+      };
+      toast({ title: 'Microfone', description: msgs[e.error] || `Erro no reconhecimento de voz (${e.error}).`, variant: 'destructive' });
+    };
+    rec.onend = () => {
+      // O Chrome encerra a escuta sozinho após alguns segundos de silêncio;
+      // religa preservando o texto já transcrito, até o usuário clicar em parar.
+      if (!stopRequestedRef.current) {
+        baseTextRef.current = inputRef.current.trim();
+        try { rec.start(); return; } catch { /* instância inválida: encerra */ }
+      }
+      setRecording(false);
+    };
     recognitionRef.current = rec;
-    setRecording(true);
     rec.start();
+  };
+
+  const toggleMic = async () => {
+    if (recording) {
+      pararMic();
+      return;
+    }
+    if (!speechSupported) {
+      toast({ title: 'Microfone', description: 'Seu navegador não suporta reconhecimento de voz. Use o Chrome ou o Edge.', variant: 'destructive' });
+      return;
+    }
+    try {
+      // Dispara o pedido de permissão explicitamente (prompt do navegador)
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+    } catch {
+      toast({ title: 'Microfone bloqueado', description: 'Permita o acesso ao microfone (ícone de cadeado na barra de endereço) e tente de novo.', variant: 'destructive' });
+      return;
+    }
+    baseTextRef.current = input.trim();
+    stopRequestedRef.current = false;
+    try {
+      iniciarReconhecimento();
+      setRecording(true);
+    } catch (err) {
+      console.error('Falha ao iniciar reconhecimento de voz', err);
+      toast({ title: 'Microfone', description: 'Não foi possível iniciar o reconhecimento de voz.', variant: 'destructive' });
+    }
   };
 
   const interpretar = async (texto, produtos, clientes) => {
@@ -225,7 +278,7 @@ Mensagem do lojista: "${texto}"`;
   const handleSend = async (texto) => {
     texto = (texto ?? input).trim();
     if (!texto || sending) return;
-    if (recording) recognitionRef.current?.stop();
+    if (recording) pararMic();
     setInput('');
     setSending(true);
     try {
@@ -354,7 +407,7 @@ Mensagem do lojista: "${texto}"`;
               variant={recording ? 'destructive' : 'outline'}
               className={`h-11 w-11 shrink-0 ${recording ? 'animate-pulse' : ''}`}
               onClick={toggleMic}
-              disabled={sending || !speechSupported}
+              disabled={sending}
               title={speechSupported ? (recording ? 'Parar gravação' : 'Falar comando') : 'Reconhecimento de voz não suportado neste navegador'}
             >
               {recording ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}

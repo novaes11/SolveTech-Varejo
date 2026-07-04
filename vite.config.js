@@ -2,8 +2,15 @@ import base44 from "@base44/vite-plugin"
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
+import path from 'path';
+
 // https://vite.dev/config/
 export default defineConfig({
+    resolve: {
+        alias: {
+            '@': path.resolve(__dirname, './src'),
+        },
+    },
     plugins: [
         base44({
             // Support for legacy code that imports the base44 SDK with @/integrations, @/entities, etc.
