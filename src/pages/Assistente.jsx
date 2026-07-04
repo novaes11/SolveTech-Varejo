@@ -7,14 +7,24 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency, formatDateTime, formatTime } from '@/lib/format';
-import { Send, Bot, Sparkles, CheckCircle2, Brain, Database, AlertTriangle, ShieldCheck } from 'lucide-react';
+import { Send, Bot, Sparkles, CheckCircle2, Brain, Database, AlertTriangle, ShieldCheck, Mic, Square } from 'lucide-react';
 
 const exemplos = [
   'Cadastre produto Refrigerante 2L por 8 reais',
-  'Registre venda de 2 Refrigerante 2L',
+  'Vendi 2 Refrigerante 2L para o João',
   'Cadastre cliente João telefone 11999999999',
-  'João deve 15 reais de compra fiada',
+  'João levou 15 reais fiado',
 ];
+
+// Compara nomes ignorando acentos, maiúsculas e espaços extras
+const norm = (s = '') => String(s).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
+const findByName = (lista, nome) => {
+  const alvo = norm(nome);
+  if (!alvo) return null;
+  return (lista || []).find(i => norm(i.nome) === alvo)
+    || (lista || []).find(i => norm(i.nome).includes(alvo) || alvo.includes(norm(i.nome)))
+    || null;
+};
 
 export default function Assistente() {
   const { data, loading } = useAsync(() => Promise.all([
@@ -22,11 +32,16 @@ export default function Assistente() {
     base44.entities.Produto.list('nome', 500),
     base44.entities.Cliente.list('nome', 500),
   ]), []);
-  const [eventos, produtos, clientes] = data || [null, null, null];
+  const [eventos] = data || [null, null, null];
 
   const [input, setInput] = useState('');
   const [sending, setSending] = useState(false);
+  const [recording, setRecording] = useState(false);
   const scrollRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const baseTextRef = useRef('');
+
+  const speechSupported = typeof window !== 'undefined' && ('SpeechRecognition' in window || 'webkitSpeechRecognition' in window);
 
   const ordered = (eventos || []).slice().reverse();
 
@@ -34,79 +49,183 @@ export default function Assistente() {
     if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
   }, [eventos, sending]);
 
-  const interpretar = async (texto) => {
-    const prompt = `Você é o assistente do SolveTech Varejo, um sistema para pequenos comerciantes brasileiros. Interprete a mensagem do lojista e retorne uma ação em JSON.
+  useEffect(() => () => { recognitionRef.current?.abort?.(); }, []);
+
+  const toggleMic = () => {
+    if (recording) {
+      recognitionRef.current?.stop();
+      return;
+    }
+    const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SR) return;
+    const rec = new SR();
+    rec.lang = 'pt-BR';
+    rec.interimResults = true;
+    rec.continuous = true;
+    baseTextRef.current = input.trim();
+    rec.onresult = (e) => {
+      let texto = '';
+      for (let i = 0; i < e.results.length; i++) texto += e.results[i][0].transcript;
+      const base = baseTextRef.current;
+      setInput((base ? `${base} ` : '') + texto.trim());
+    };
+    rec.onend = () => setRecording(false);
+    rec.onerror = () => setRecording(false);
+    recognitionRef.current = rec;
+    setRecording(true);
+    rec.start();
+  };
+
+  const interpretar = async (texto, produtos, clientes) => {
+    const prompt = `Você é o assistente do SolveTech Varejo, um sistema para pequenos comerciantes brasileiros. Interprete a mensagem do lojista e extraia a intenção e os dados.
 
 Produtos cadastrados: ${(produtos || []).map(p => p.nome).join(', ') || 'nenhum'}
 Clientes cadastrados: ${(clientes || []).map(c => c.nome).join(', ') || 'nenhum'}
 
 Intenções possíveis:
-- criar_produto: cadastrar um novo produto. parameters: {nome, preco_venda}
-- registrar_venda: registrar uma venda (diminui estoque). parameters: {produto_nome, quantidade}
-- criar_cliente: cadastrar cliente. parameters: {nome, telefone}
-- registrar_fiado: registrar compra fiada (aumenta saldo devedor). parameters: {cliente_nome, valor, descricao}
-- consultar_saldo: consultar saldo devedor de um cliente. parameters: {cliente_nome}
-- desconhecido: não foi possível entender
+- criar_produto: cadastrar um novo produto. Preencha nome, preco_venda e, se informados, preco_custo e quantidade.
+- registrar_venda: registrar uma venda (diminui estoque). Preencha produto_nome e quantidade. Se o lojista disser para quem vendeu, preencha cliente_nome. Se disser que foi fiado/na caderneta/para pagar depois, use fiado: true.
+- criar_cliente: cadastrar cliente. Preencha nome e telefone.
+- registrar_fiado: registrar dívida fiada sem venda de produto específico (aumenta saldo devedor). Preencha cliente_nome, valor e descricao.
+- registrar_pagamento: cliente pagou/abateu parte do fiado. Preencha cliente_nome e valor.
+- consultar_saldo: consultar saldo devedor de um cliente. Preencha cliente_nome.
+- desconhecido: não foi possível entender.
 
-Retorne JSON: {"intent": "...", "parameters": {...}, "resposta": "mensagem curta e amigável em português brasileiro confirmando a ação"}. Se faltar informação, use intent "desconhecido" e peça esclarecimento na resposta.`;
-    return await base44.integrations.Core.InvokeLLM({
-      prompt: `${prompt}\n\nMensagem do lojista: "${texto}"`,
+Regras:
+- Valores em reais devem virar números (ex: "8 reais" -> 8, "R$ 2,50" -> 2.5).
+- Use os nomes de produtos/clientes cadastrados quando a mensagem se referir a eles, mesmo com pequenas variações.
+- Campos que não se aplicam à intenção: use "" para textos, 0 para números e false para fiado.
+- Se faltar informação essencial, use intent "desconhecido" e peça o dado que falta na resposta.
+- resposta: mensagem curta e amigável em português brasileiro confirmando a ação (ou pedindo o que falta).
+
+Mensagem do lojista: "${texto}"`;
+    // O structured output do InvokeLLM exige "required" com todas as chaves de
+    // "properties" e rejeita objetos livres (additionalProperties: true),
+    // por isso o schema é plano em vez de um objeto "parameters" dinâmico.
+    const r = await base44.integrations.Core.InvokeLLM({
+      prompt,
       response_json_schema: {
         type: 'object',
         properties: {
           intent: { type: 'string' },
-          parameters: { type: 'object', additionalProperties: true },
           resposta: { type: 'string' },
+          produto_nome: { type: 'string' },
+          cliente_nome: { type: 'string' },
+          nome: { type: 'string' },
+          telefone: { type: 'string' },
+          quantidade: { type: 'number' },
+          valor: { type: 'number' },
+          preco_venda: { type: 'number' },
+          preco_custo: { type: 'number' },
+          descricao: { type: 'string' },
+          fiado: { type: 'boolean' },
         },
-        required: ['intent', 'resposta'],
+        required: ['intent', 'resposta', 'produto_nome', 'cliente_nome', 'nome', 'telefone', 'quantidade', 'valor', 'preco_venda', 'preco_custo', 'descricao', 'fiado'],
+        additionalProperties: false,
       },
     });
+    const { intent, resposta, ...parameters } = r || {};
+    return { intent, resposta, parameters };
   };
 
-  const executarAcao = async (intent, parameters = {}) => {
+  const executarAcao = async (intent, parameters = {}, produtos = [], clientes = []) => {
     switch (intent) {
       case 'criar_produto': {
-        await base44.entities.Produto.create({ nome: String(parameters.nome || 'Produto').trim(), preco_venda: Number(parameters.preco_venda) || 0, quantidade: 0, quantidade_minima: 0 });
-        return { acao: 'Produto cadastrado', detalhes: parameters.nome };
+        const nome = String(parameters.nome || parameters.produto_nome || '').trim();
+        if (!nome) return { acao: 'Nome do produto não informado', detalhes: '', erro: true };
+        const existente = findByName(produtos, nome);
+        if (existente) return { acao: 'Produto já cadastrado', detalhes: existente.nome, erro: true };
+        await base44.entities.Produto.create({
+          nome,
+          preco_venda: Number(parameters.preco_venda) || 0,
+          preco_custo: Number(parameters.preco_custo) || 0,
+          quantidade: Number(parameters.quantidade) || 0,
+          quantidade_minima: 0,
+        });
+        return { acao: 'Produto cadastrado', detalhes: nome };
       }
       case 'registrar_venda': {
-        const prod = (produtos || []).find(p => p.nome.toLowerCase() === String(parameters.produto_nome || '').toLowerCase());
+        const prod = findByName(produtos, parameters.produto_nome);
         if (!prod) return { acao: 'Produto não encontrado', detalhes: parameters.produto_nome, erro: true };
         const qtd = Number(parameters.quantidade) || 1;
         if (qtd > prod.quantidade) return { acao: 'Estoque insuficiente', detalhes: `Há apenas ${prod.quantidade} de ${prod.nome}`, erro: true };
+
+        let cli = null;
+        if (parameters.cliente_nome) {
+          cli = findByName(clientes, parameters.cliente_nome);
+          if (!cli) return { acao: 'Cliente não encontrado', detalhes: `Cadastre o cliente "${parameters.cliente_nome}" antes de registrar a venda para ele.`, erro: true };
+        }
+        const fiado = Boolean(parameters.fiado);
+        if (fiado && !cli) return { acao: 'Cliente obrigatório', detalhes: 'Venda fiada precisa de um cliente cadastrado.', erro: true };
+
         const total = prod.preco_venda * qtd;
         const lucro = (prod.preco_venda - (prod.preco_custo || 0)) * qtd;
-        await base44.entities.Venda.create({ produto_id: prod.id, produto_nome: prod.nome, quantidade: qtd, preco_unitario: prod.preco_venda, custo_unitario: prod.preco_custo || 0, total, lucro, data: new Date().toISOString() });
+        await base44.entities.Venda.create({
+          produto_id: prod.id,
+          produto_nome: prod.nome,
+          quantidade: qtd,
+          preco_unitario: prod.preco_venda,
+          custo_unitario: prod.preco_custo || 0,
+          total,
+          lucro,
+          descricao: cli ? `Venda para ${cli.nome}${fiado ? ' (fiado)' : ''}` : '',
+          data: new Date().toISOString(),
+        });
         await base44.entities.Produto.update(prod.id, { quantidade: prod.quantidade - qtd });
-        return { acao: 'Venda registrada', detalhes: `${qtd}x ${prod.nome} = ${formatCurrency(total)}` };
+        if (fiado && cli) {
+          await base44.entities.MovimentacaoFiado.create({
+            cliente_id: cli.id,
+            cliente_nome: cli.nome,
+            tipo: 'compra',
+            valor: total,
+            descricao: `${qtd}x ${prod.nome} (fiado)`,
+            data: new Date().toISOString(),
+          });
+        }
+        const paraQuem = cli ? ` para ${cli.nome}${fiado ? ' (fiado)' : ''}` : '';
+        return { acao: fiado ? 'Venda fiada registrada' : 'Venda registrada', detalhes: `${qtd}x ${prod.nome} = ${formatCurrency(total)}${paraQuem}` };
       }
       case 'criar_cliente': {
-        await base44.entities.Cliente.create({ nome: String(parameters.nome || '').trim(), telefone: String(parameters.telefone || ''), limite_credito: 0, status: 'ativo' });
-        return { acao: 'Cliente cadastrado', detalhes: parameters.nome };
+        const nome = String(parameters.nome || parameters.cliente_nome || '').trim();
+        if (!nome) return { acao: 'Nome do cliente não informado', detalhes: '', erro: true };
+        const existente = findByName(clientes, nome);
+        if (existente) return { acao: 'Cliente já cadastrado', detalhes: existente.nome, erro: true };
+        await base44.entities.Cliente.create({ nome, telefone: String(parameters.telefone || ''), limite_credito: 0, status: 'ativo' });
+        return { acao: 'Cliente cadastrado', detalhes: nome };
       }
       case 'registrar_fiado': {
-        const cli = (clientes || []).find(c => c.nome.toLowerCase() === String(parameters.cliente_nome || '').toLowerCase());
+        const cli = findByName(clientes, parameters.cliente_nome);
         if (!cli) return { acao: 'Cliente não encontrado', detalhes: parameters.cliente_nome, erro: true };
         const valor = Number(parameters.valor) || 0;
         if (valor <= 0) return { acao: 'Valor inválido', detalhes: '', erro: true };
         await base44.entities.MovimentacaoFiado.create({ cliente_id: cli.id, cliente_nome: cli.nome, tipo: 'compra', valor, descricao: String(parameters.descricao || 'Compra fiada'), data: new Date().toISOString() });
         return { acao: 'Compra fiada registrada', detalhes: `${cli.nome}: ${formatCurrency(valor)}` };
       }
+      case 'registrar_pagamento': {
+        const cli = findByName(clientes, parameters.cliente_nome);
+        if (!cli) return { acao: 'Cliente não encontrado', detalhes: parameters.cliente_nome, erro: true };
+        const valor = Number(parameters.valor) || 0;
+        if (valor <= 0) return { acao: 'Valor inválido', detalhes: '', erro: true };
+        await base44.entities.MovimentacaoFiado.create({ cliente_id: cli.id, cliente_nome: cli.nome, tipo: 'pagamento', valor, descricao: 'Pagamento registrado pelo assistente', data: new Date().toISOString() });
+        return { acao: 'Pagamento registrado', detalhes: `${cli.nome}: ${formatCurrency(valor)}` };
+      }
       case 'consultar_saldo': {
-        const cli = (clientes || []).find(c => c.nome.toLowerCase() === String(parameters.cliente_nome || '').toLowerCase());
+        const cli = findByName(clientes, parameters.cliente_nome);
         if (!cli) return { acao: 'Cliente não encontrado', detalhes: parameters.cliente_nome, erro: true };
         const movs = await base44.entities.MovimentacaoFiado.filter({ cliente_id: cli.id });
         const saldo = movs.reduce((s, m) => s + (m.tipo === 'compra' ? (m.valor || 0) : -(m.valor || 0)), 0);
         return { acao: 'Saldo consultado', detalhes: `${cli.nome}: ${formatCurrency(saldo)}`, respostaExtra: `${cli.nome} deve ${formatCurrency(saldo)} no momento.` };
       }
       default:
-        return { acao: 'Sem ação', detalhes: '', erro: true };
+        // Mensagem sem ação (saudação, pedido de esclarecimento): responde sem marcar erro
+        return { acao: 'Nenhuma ação necessária', detalhes: '', neutro: true };
     }
   };
 
   const handleSend = async (texto) => {
     texto = (texto ?? input).trim();
     if (!texto || sending) return;
+    if (recording) recognitionRef.current?.stop();
     setInput('');
     setSending(true);
     try {
@@ -118,24 +237,34 @@ Retorne JSON: {"intent": "...", "parameters": {...}, "resposta": "mensagem curta
       });
       notifyDataChanged();
 
-      const result = await interpretar(texto);
+      // Busca listas atualizadas na hora de executar, evitando dados defasados do render
+      const [produtos, clientes] = await Promise.all([
+        base44.entities.Produto.list('nome', 500),
+        base44.entities.Cliente.list('nome', 500),
+      ]);
+
+      const result = await interpretar(texto, produtos, clientes);
       const { intent, parameters, resposta } = result || {};
-      const exec = await executarAcao(intent, parameters || {});
+      const exec = await executarAcao(intent, parameters || {}, produtos, clientes);
 
       await base44.entities.EventoAssistente.create({
         remetente: 'sistema',
-        mensagem_original: exec.respostaExtra || resposta || 'Não consegui processar sua mensagem.',
+        mensagem_original: exec.erro ? `${exec.acao}${exec.detalhes ? `: ${exec.detalhes}` : ''}` : (exec.respostaExtra || resposta || 'Não consegui processar sua mensagem.'),
         intencao: intent || 'desconhecido',
         acao_realizada: exec.acao,
         detalhes: exec.detalhes || '',
-        status: exec.erro ? 'erro' : 'executado',
+        status: exec.erro ? 'erro' : (exec.neutro ? 'classificado' : 'executado'),
         data: new Date().toISOString(),
       });
-      if (!exec.erro) notifyDataChanged();
+      notifyDataChanged();
     } catch (err) {
+      console.error('Assistente: falha ao processar mensagem', err);
+      const motivo = err?.message || err?.data?.message || '';
       await base44.entities.EventoAssistente.create({
         remetente: 'sistema',
-        mensagem_original: 'Não consegui processar sua mensagem agora. Tente novamente.',
+        mensagem_original: `Não consegui processar sua mensagem agora. Tente novamente.${motivo ? ` (detalhe técnico: ${motivo})` : ''}`,
+        acao_realizada: 'Erro interno',
+        detalhes: motivo,
         status: 'erro',
         data: new Date().toISOString(),
       }).catch(() => { });
@@ -165,7 +294,7 @@ Retorne JSON: {"intent": "...", "parameters": {...}, "resposta": "mensagem curta
               <div className="flex flex-col items-center justify-center text-center py-10 px-4">
                 <div className="w-16 h-16 rounded-2xl bg-primary/10 text-primary flex items-center justify-center mb-4"><Sparkles className="w-8 h-8" /></div>
                 <h3 className="font-heading font-semibold">Converse com seu assistente</h3>
-                <p className="text-sm text-muted-foreground mt-1 max-w-xs">Envie comandos por texto para cadastrar produtos, registrar vendas, clientes e fiado. As ações são salvas automaticamente.</p>
+                <p className="text-sm text-muted-foreground mt-1 max-w-xs">Envie comandos por texto ou voz para cadastrar produtos, registrar vendas, clientes e fiado. As ações são salvas automaticamente.</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-5 w-full max-w-md">
                   {exemplos.map((ex) => (
                     <button key={ex} onClick={() => handleSend(ex)} className="text-left text-sm p-3 rounded-lg border border-border bg-card hover:border-primary/40 hover:bg-primary/5 transition-colors">
@@ -183,7 +312,7 @@ Retorne JSON: {"intent": "...", "parameters": {...}, "resposta": "mensagem curta
                       <div className={`px-4 py-2.5 rounded-2xl text-sm ${isUser ? 'bg-primary text-primary-foreground rounded-br-md' : 'bg-card border border-border rounded-bl-md'}`}>
                         {ev.mensagem_original}
                       </div>
-                      {!isUser && ev.status !== 'erro' && (
+                      {!isUser && ev.status === 'executado' && (
                         <div className="flex flex-wrap gap-1.5 mt-1.5">
                           <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600"><Brain className="w-3 h-3" /> Intenção classificada</span>
                           <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-primary/10 text-primary"><Database className="w-3 h-3" /> Banco atualizado</span>
@@ -212,7 +341,24 @@ Retorne JSON: {"intent": "...", "parameters": {...}, "resposta": "mensagem curta
           </div>
 
           <form onSubmit={(e) => { e.preventDefault(); handleSend(); }} className="p-3 border-t border-border flex gap-2">
-            <Input value={input} onChange={(e) => setInput(e.target.value)} placeholder="Digite um comando..." className="h-11 bg-card" disabled={sending} />
+            <Input
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              placeholder={recording ? 'Ouvindo... fale agora' : 'Digite um comando...'}
+              className="h-11 bg-card"
+              disabled={sending}
+            />
+            <Button
+              type="button"
+              size="icon"
+              variant={recording ? 'destructive' : 'outline'}
+              className={`h-11 w-11 shrink-0 ${recording ? 'animate-pulse' : ''}`}
+              onClick={toggleMic}
+              disabled={sending || !speechSupported}
+              title={speechSupported ? (recording ? 'Parar gravação' : 'Falar comando') : 'Reconhecimento de voz não suportado neste navegador'}
+            >
+              {recording ? <Square className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+            </Button>
             <Button type="submit" size="icon" className="h-11 w-11 shrink-0" disabled={sending || !input.trim()}><Send className="w-4 h-4" /></Button>
           </form>
         </Card>

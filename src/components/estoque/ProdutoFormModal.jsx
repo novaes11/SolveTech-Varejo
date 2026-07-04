@@ -15,10 +15,12 @@ import { parseCurrencyInput } from '@/lib/format';
 const textareaCls =
   'w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
+const toBR = (n, casas = 2) => (Number.isFinite(n) ? n.toFixed(casas).replace('.', ',') : '');
+
 export default function ProdutoFormModal({ open, onOpenChange, produto, defaultCodigoBarras }) {
   const { toast } = useToast();
   const [form, setForm] = useState({
-    nome: '', categoria: '', descricao: '', preco_custo: '', preco_venda: '', quantidade: '', quantidade_minima: '', codigo_barras: '',
+    nome: '', categoria: '', descricao: '', preco_custo: '', preco_venda: '', margem: '', quantidade: '', quantidade_minima: '', codigo_barras: '',
   });
   const [loading, setLoading] = useState(false);
   const [scannerOpen, setScannerOpen] = useState(false);
@@ -31,6 +33,9 @@ export default function ProdutoFormModal({ open, onOpenChange, produto, defaultC
         descricao: produto?.descricao || '',
         preco_custo: produto?.preco_custo != null ? String(produto.preco_custo).replace('.', ',') : '',
         preco_venda: produto?.preco_venda != null ? String(produto.preco_venda).replace('.', ',') : '',
+        margem: produto?.preco_custo > 0 && produto?.preco_venda != null
+          ? toBR(((produto.preco_venda - produto.preco_custo) / produto.preco_custo) * 100, 1)
+          : '',
         quantidade: produto?.quantidade != null ? String(produto.quantidade) : '',
         quantidade_minima: produto?.quantidade_minima != null ? String(produto.quantidade_minima) : '',
         codigo_barras: produto?.codigo_barras || defaultCodigoBarras || '',
@@ -39,6 +44,47 @@ export default function ProdutoFormModal({ open, onOpenChange, produto, defaultC
   }, [open, produto, defaultCodigoBarras]);
 
   const set = (k) => (e) => setForm(s => ({ ...s, [k]: e.target.value }));
+
+  // Custo, margem (%) e preço de venda mantidos em sincronia:
+  // editar custo ou margem recalcula a venda; editar a venda recalcula a margem.
+  const setCusto = (e) => {
+    const preco_custo = e.target.value;
+    setForm(s => {
+      const custo = parseCurrencyInput(preco_custo);
+      const margem = parseCurrencyInput(s.margem);
+      if (custo > 0 && s.margem !== '') {
+        return { ...s, preco_custo, preco_venda: toBR(custo * (1 + margem / 100)) };
+      }
+      const venda = parseCurrencyInput(s.preco_venda);
+      if (custo > 0 && venda > 0) {
+        return { ...s, preco_custo, margem: toBR(((venda - custo) / custo) * 100, 1) };
+      }
+      return { ...s, preco_custo };
+    });
+  };
+
+  const setMargem = (e) => {
+    const margem = e.target.value;
+    setForm(s => {
+      const custo = parseCurrencyInput(s.preco_custo);
+      if (custo > 0 && margem !== '') {
+        return { ...s, margem, preco_venda: toBR(custo * (1 + parseCurrencyInput(margem) / 100)) };
+      }
+      return { ...s, margem };
+    });
+  };
+
+  const setVenda = (e) => {
+    const preco_venda = e.target.value;
+    setForm(s => {
+      const custo = parseCurrencyInput(s.preco_custo);
+      const venda = parseCurrencyInput(preco_venda);
+      if (custo > 0 && venda > 0) {
+        return { ...s, preco_venda, margem: toBR(((venda - custo) / custo) * 100, 1) };
+      }
+      return { ...s, preco_venda, margem: venda > 0 ? s.margem : '' };
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -94,13 +140,23 @@ export default function ProdutoFormModal({ open, onOpenChange, produto, defaultC
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label htmlFor="preco_venda">Preço de venda (R$) *</Label>
-                <Input id="preco_venda" inputMode="decimal" value={form.preco_venda} onChange={set('preco_venda')} placeholder="0,00" required />
+                <Label htmlFor="preco_custo">Preço de custo (R$)</Label>
+                <Input id="preco_custo" inputMode="decimal" value={form.preco_custo} onChange={setCusto} placeholder="0,00" />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="preco_custo">Preço de custo (R$)</Label>
-                <Input id="preco_custo" inputMode="decimal" value={form.preco_custo} onChange={set('preco_custo')} placeholder="0,00" />
+                <Label htmlFor="margem">Margem sobre o custo (%)</Label>
+                <Input id="margem" inputMode="decimal" value={form.margem} onChange={setMargem} placeholder="Ex: 50" disabled={parseCurrencyInput(form.preco_custo) <= 0} title={parseCurrencyInput(form.preco_custo) <= 0 ? 'Informe o preço de custo para usar a margem' : ''} />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="preco_venda">Preço de venda (R$) *</Label>
+              <Input id="preco_venda" inputMode="decimal" value={form.preco_venda} onChange={setVenda} placeholder="0,00" required />
+              {parseCurrencyInput(form.preco_custo) > 0 && parseCurrencyInput(form.preco_venda) > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Lucro por unidade: {toBR(parseCurrencyInput(form.preco_venda) - parseCurrencyInput(form.preco_custo))} R$
+                  {form.margem !== '' && ` (margem de ${form.margem}%)`}
+                </p>
+              )}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">

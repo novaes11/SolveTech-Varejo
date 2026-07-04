@@ -19,19 +19,38 @@ export default function Register() {
     const [showOtp, setShowOtp] = useState(false);
     const [otpCode, setOtpCode] = useState("");
 
+    const traduzErro = (msg = "") => {
+        const m = msg.toLowerCase();
+        if (m.includes("at least 8 characters")) return "A senha deve ter pelo menos 8 caracteres.";
+        if (m.includes("already exists") || m.includes("already registered")) return "Já existe uma conta com este e-mail. Faça login ou recupere sua senha.";
+        if (m.includes("invalid email")) return "E-mail inválido. Confira o endereço digitado.";
+        if (m.includes("invalid") && m.includes("otp")) return "Código de verificação inválido ou expirado.";
+        return msg;
+    };
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError("");
+        if (password.length < 8) {
+            setError("A senha deve ter pelo menos 8 caracteres.");
+            return;
+        }
         if (password !== confirmPassword) {
             setError("As senhas não coincidem.");
             return;
         }
         setLoading(true);
         try {
+            // O backend da Base44 gera o código de verificação e o envia
+            // automaticamente para o e-mail cadastrado.
             await base44.auth.register({ email, password });
             setShowOtp(true);
+            toast({
+                title: "Código enviado",
+                description: `Enviamos um código de verificação para ${email}.`,
+            });
         } catch (err) {
-            setError(err.message || "Não foi possível cadastrar. Tente novamente.");
+            setError(traduzErro(err.message) || "Não foi possível cadastrar. Tente novamente.");
         } finally {
             setLoading(false);
         }
@@ -45,9 +64,16 @@ export default function Register() {
             if (result?.access_token) {
                 base44.auth.setToken(result.access_token);
             }
+            // Boas-vindas em nome do suporte; não bloqueia o cadastro se falhar
+            base44.integrations.Core.SendEmail({
+                to: email,
+                from_name: "SolveTech Suporte",
+                subject: "Bem-vindo ao SolveTech Varejo!",
+                body: `Olá!\n\nSua conta no SolveTech Varejo foi verificada com sucesso. Agora você já pode controlar estoque, vendas e caderneta de fiado em um só lugar.\n\nQualquer dúvida, fale com a gente: solvetechsuporte@gmail.com\n\nEquipe SolveTech`,
+            }).catch(() => { });
             window.location.href = "/";
         } catch (err) {
-            setError(err.message || "Código de verificação inválido.");
+            setError(traduzErro(err.message) || "Código de verificação inválido.");
         } finally {
             setLoading(false);
         }
