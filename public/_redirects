@@ -1,1 +1,5 @@
+# Encaminha as chamadas de API para o backend da Base44 (proxy)
+/api/*    https://base44.app/api/:splat    200
+
+# Fallback do SPA: qualquer outra rota carrega o app React
 /*    /index.html   200
