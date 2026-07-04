@@ -1,356 +1,77 @@
-# 🏪 SolveTech Varejo
+# Base44 Project
 
-Sistema de gestão para varejo popular — feito sob medida para feirantes, vendedores de barraquinha e pequenos comerciantes. O diferencial é uma **IA vendedora integrada ao WhatsApp** que gerencia estoque, atende clientes e controla a caderneta de fiado, tudo de forma simples e acessível.
+Use this repository to run and edit the app locally, then publish changes back through Base44.
 
----
+Any change pushed to the repo will also be reflected in the Base44 Builder.
 
-## 📋 Índice
+## Prerequisites
 
-- [Visão Geral](#-visão-geral)
-- [Funcionalidades](#-funcionalidades)
-- [Arquitetura](#-arquitetura)
-- [Tech Stack](#-tech-stack)
-- [Pré-requisitos](#-pré-requisitos)
-- [Como Rodar](#-como-rodar)
-  - [Backend (FastAPI)](#1-backend-fastapi)
-  - [Frontend (React)](#2-frontend-react)
-- [Endpoints da API](#-endpoints-da-api)
-- [Estrutura de Pastas](#-estrutura-de-pastas)
-- [Variáveis de Ambiente](#-variáveis-de-ambiente)
+1. Clone the repository using the project's Git URL.
+2. Navigate to the project directory.
+3. Install dependencies: `npm install`.
+4. Install the Base44 CLI: `npm install -g base44@latest`.
 
----
+See the [Base44 CLI docs](https://docs.base44.com/developers/references/cli/get-started/overview) if you want to run Base44 commands directly.
 
-## 🎯 Visão Geral
+## Run Locally
 
-O SolveTech Varejo é um MVP que resolve três dores do pequeno comerciante:
+Run the full local development environment from the project root:
 
-1. **Controle de Estoque** — saber o que tem, quanto custa e quando repor.
-2. **Caderneta Digital (Fiado)** — acabou a caderneta de papel. Aqui o limite é controlado, o saldo é calculado automaticamente e o histórico fica salvo.
-3. **IA Vendedora no WhatsApp** — um chatbot (mock por enquanto) que recebe mensagens, consulta o estoque e o fiado do cliente, e responde de forma inteligente.
-
----
-
-## ✨ Funcionalidades
-
-| Módulo | Descrição |
-|--------|-----------|
-| **Estoque** | CRUD completo de produtos (nome, preço, quantidade, foto) |
-| **Caderneta** | Cadastro de clientes, limite de fiado, saldo devedor dinâmico, histórico de movimentações |
-| **Webhook WhatsApp** | Endpoint para receber/verificar webhooks da Meta (GET + POST) |
-| **IA Vendedora** | Serviço mock que reconhece intenções ("cardápio", "fiado") e responde com dados reais do banco |
-| **Transcrição de Áudio** | Mensagens de voz do WhatsApp são transcritas (OpenAI, pt-BR) e seguem o mesmo fluxo do texto |
-| **Venda por Voz** | "Vendi 2 pastéis pro Kenzo" (áudio ou texto) registra a venda, dá baixa no estoque e, com "fiado", anota na caderneta |
-| **Painel Admin** | Dashboard com gráficos, tela de estoque com busca e CRUD, caderneta com master-detail |
-| **Logging Colorido** | Logger customizado com cores ANSI para monitorar requisições, banco e IA no terminal |
-
----
-
-## 🏗 Arquitetura
-
-```
-┌──────────────────────┐     HTTP      ┌──────────────────────┐
-│                      │ ◄──────────── │                      │
-│   Frontend (React)   │               │   WhatsApp (Meta)    │
-│   localhost:5173      │               │   Webhook            │
-│                      │               │                      │
-└──────────┬───────────┘               └──────────┬───────────┘
-           │ Axios                                │ POST
-           ▼                                      ▼
-┌─────────────────────────────────────────────────────────────┐
-│                    Backend (FastAPI)                         │
-│                    localhost:8000                            │
-│                                                             │
-│  ┌─────────┐  ┌──────────┐  ┌───────────┐  ┌────────────┐  │
-│  │ Estoque │  │  Fiado   │  │ WhatsApp  │  │ IA Vendedora│  │
-│  │ Router  │  │  Router  │  │  Router   │  │  Service    │  │
-│  └────┬────┘  └────┬─────┘  └─────┬─────┘  └──────┬─────┘  │
-│       │            │              │               │         │
-│       └────────────┴──────────────┴───────────────┘         │
-│                           │                                 │
-│                    SQLAlchemy ORM                            │
-│                           │                                 │
-│                    ┌──────┴──────┐                           │
-│                    │   SQLite    │                           │
-│                    │ solvetech.db│                           │
-│                    └─────────────┘                           │
-└─────────────────────────────────────────────────────────────┘
+```bash
+base44 dev
 ```
 
----
+`base44 dev` starts the local Base44 development backend and, when this app is configured for it, also starts the frontend dev server for you. Use the frontend URL printed by the command.
 
-## 🛠 Tech Stack
+For example, when the Base44 project config includes a `serveCommand`, `base44 dev` can launch the frontend too:
 
-### Backend
-| Tecnologia | Versão | Propósito |
-|------------|--------|-----------|
-| Python | 3.11+ | Linguagem principal |
-| FastAPI | 0.115.6 | Framework web assíncrono |
-| Uvicorn | 0.32.1 | Servidor ASGI |
-| SQLAlchemy | 2.0.36 | ORM para banco de dados |
-| Pydantic | 2.10.3 | Validação de dados e schemas |
-| SQLite | — | Banco de dados (embutido) |
-
-### Frontend
-| Tecnologia | Propósito |
-|------------|-----------|
-| React 19 | UI declarativa |
-| Vite | Build tool e dev server |
-| Tailwind CSS 3 | Estilização utility-first |
-| React Router DOM | Roteamento SPA |
-| Axios | Requisições HTTP |
-| Recharts | Gráficos e visualização |
-| Lucide React | Biblioteca de ícones |
-
----
-
-## 📦 Pré-requisitos
-
-Antes de começar, certifique-se de ter instalado:
-
-- **Python 3.11+** → [python.org/downloads](https://www.python.org/downloads/)
-- **Node.js 18+** → [nodejs.org](https://nodejs.org/)
-- **Git** → [git-scm.com](https://git-scm.com/)
-
-Verifique se está tudo certo:
-
-```powershell
-python --version   # Python 3.11.x ou superior
-node --version     # v18.x ou superior
-npm --version      # 9.x ou superior
+```json5
+{
+  "site": {
+    "serveCommand": "npm run dev"
+  }
+}
 ```
 
----
+In a Base44 project this lives in `base44/config.jsonc`.
 
-## 🚀 Como Rodar
+## Run Only The Frontend
 
-### 1. Backend (FastAPI)
+If you only want to work on the frontend against the hosted Base44 backend, run:
 
-Abra um terminal na **raiz do projeto** e execute:
-
-```powershell
-# Entrar na pasta do backend
-cd backend
-
-# Criar o ambiente virtual
-python -m venv venv
-
-# Ativar o ambiente virtual (Windows PowerShell)
-.\venv\Scripts\Activate
-
-# Instalar as dependências
-pip install -r requirements.txt
-
-# Subir o servidor FastAPI
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Você verá algo assim no terminal (com cores!):
-
-```
-20:30:01 INFO     │ app.main                  │ 🔧 Criando tabelas no banco (se não existirem)...
-20:30:01 INFO     │ app.main                  │ 🚀 SolveTech Varejo v0.1.0 no ar!
-20:30:01 INFO     │ app.main                  │ 📄 Swagger disponível em: http://localhost:8000/docs
-```
-
-**Acessos do backend:**
-
-| URL | Descrição |
-|-----|-----------|
-| http://localhost:8000 | Health check |
-| http://localhost:8000/docs | Swagger UI (documentação interativa) |
-| http://localhost:8000/redoc | ReDoc (documentação alternativa) |
-
-> 💡 O banco SQLite (`solvetech.db`) e a pasta `uploads/` são criados automaticamente na primeira execução.
-
----
-
-### 2. Frontend (React)
-
-Abra **outro terminal** na raiz do projeto e execute:
-
-```powershell
-# Entrar na pasta do frontend
-cd frontend
-
-# Instalar as dependências
-npm install
-
-# Subir o servidor de desenvolvimento
+```bash
 npm run dev
 ```
 
-O Vite vai iniciar e mostrar:
+Open the local URL printed by Vite.
 
-```
-  VITE v8.x.x  ready in Xms
+## Use The Hosted Backend
 
-  ➜  Local:   http://localhost:5173/
-  ➜  Network: http://192.168.x.x:5173/
-```
+For frontend-only development, create or update `.env.local` in the project root:
 
-**Acesse o painel em:** http://localhost:5173
-
-> ⚠️ **Importante:** O backend precisa estar rodando na porta 8000 para que o frontend consiga buscar os dados. Rode os dois servidores simultaneamente em terminais separados.
-
----
-
-### Resumo Rápido (dois terminais)
-
-**Terminal 1 — Backend:**
-```powershell
-cd backend
-.\venv\Scripts\Activate
-uvicorn app.main:app --reload --port 8000
+```bash
+VITE_BASE44_APP_ID=your_app_id
+VITE_BASE44_APP_BASE_URL=https://your-app.base44.app
 ```
 
-**Terminal 2 — Frontend:**
-```powershell
-cd frontend
-npm run dev
+`VITE_BASE44_APP_ID` identifies the Base44 app.
+
+`VITE_BASE44_APP_BASE_URL` tells the Base44 Vite plugin where to send local `/api` requests. Point it at your deployed Base44 app URL when you want the local frontend to use the hosted backend.
+
+When you use `base44 dev`, the command injects the local Base44 values for you, so `.env.local` is mainly needed for frontend-only workflows.
+
+## Publish Your Changes
+
+After pushing your changes to git, open the Base44 dashboard and publish the app:
+
+```bash
+base44 dashboard open
 ```
 
----
+## Docs & Support
 
-## 📡 Endpoints da API
+Documentation: [https://docs.base44.com/Integrations/Using-GitHub](https://docs.base44.com/Integrations/Using-GitHub)
 
-### Estoque (`/api/estoque`)
+Base44 CLI command reference: [https://docs.base44.com/developers/references/cli/commands/introduction](https://docs.base44.com/developers/references/cli/commands/introduction)
 
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| `GET` | `/api/estoque/` | Listar todos os produtos |
-| `GET` | `/api/estoque/{id}` | Buscar produto por ID |
-| `POST` | `/api/estoque/` | Cadastrar novo produto |
-| `PATCH` | `/api/estoque/{id}` | Atualizar produto (parcial) |
-| `DELETE` | `/api/estoque/{id}` | Remover produto |
-
-### Caderneta / Fiado (`/api/fiado`)
-
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| `GET` | `/api/fiado/clientes` | Listar todos os clientes |
-| `GET` | `/api/fiado/clientes/{id}` | Buscar cliente com saldo e histórico |
-| `POST` | `/api/fiado/clientes` | Cadastrar novo cliente |
-| `PATCH` | `/api/fiado/clientes/{id}` | Atualizar cliente |
-| `DELETE` | `/api/fiado/clientes/{id}` | Remover cliente |
-| `GET` | `/api/fiado/movimentacoes/{cliente_id}` | Histórico de movimentações |
-| `POST` | `/api/fiado/movimentacoes` | Registrar compra ou pagamento |
-
-### Vendas (`/api/vendas`)
-
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| `GET` | `/api/vendas/` | Listar vendas (mais recentes primeiro) |
-| `POST` | `/api/vendas/` | Registrar venda (dá baixa no estoque) |
-
-> 🎤 Vendas também podem ser registradas **por voz ou texto no WhatsApp**: mande "vendi 2 pastéis pro Kenzo" que a IA entende quantidade, produto (com busca aproximada) e cliente. Falando "fiado", a compra também entra na caderneta do cliente.
-
-### WhatsApp Webhook (`/api/whatsapp`)
-
-| Método | Rota | Descrição |
-|--------|------|-----------|
-| `GET` | `/api/whatsapp/webhook` | Verificação do webhook (Meta) |
-| `POST` | `/api/whatsapp/webhook` | Receber mensagem (texto ou áudio) e processar com IA |
-
-**Mensagem de texto:**
-
-```json
-{ "telefone": "5511999990000", "mensagem": "cardápio" }
-```
-
-**Mensagem de áudio** (nota de voz) — envie `tipo: "audio"` com o arquivo via URL **ou** base64:
-
-```json
-{ "telefone": "5511999990000", "tipo": "audio", "audio_url": "https://.../voz.ogg" }
-```
-
-```json
-{ "telefone": "5511999990000", "tipo": "audio", "audio_base64": "<bytes em base64>", "audio_formato": "ogg" }
-```
-
-O áudio é transcrito em português (OpenAI Whisper) e o texto segue o mesmo fluxo da mensagem digitada. A resposta inclui o campo `transcricao`. Requer `OPENAI_API_KEY` configurada — sem ela, o bot responde avisando que o recurso não está habilitado. Formatos fora da lista aceita pela OpenAI (ex.: `.amr`) são convertidos com **FFmpeg**, se instalado.
-
----
-
-## 📁 Estrutura de Pastas
-
-```
-SolveTech-Varejo/
-├── README.md
-├── .gitignore
-│
-├── backend/
-│   ├── requirements.txt
-│   ├── solvetech.db              ← Criado automaticamente
-│   ├── uploads/                  ← Criado automaticamente
-│   └── app/
-│       ├── main.py               ← Entrypoint FastAPI
-│       ├── config.py             ← Configurações (pydantic-settings)
-│       ├── database.py           ← Engine SQLite + sessão
-│       ├── models/
-│       │   ├── estoque.py        ← Model Produto
-│       │   └── fiado.py          ← Models Cliente + Fiado
-│       ├── schemas/
-│       │   ├── estoque.py        ← Schemas Pydantic de produto
-│       │   └── fiado.py          ← Schemas de cliente e fiado
-│       ├── routers/
-│       │   ├── estoque.py        ← CRUD de produtos
-│       │   ├── fiado.py          ← CRUD de clientes + movimentações
-│       │   └── whatsapp.py       ← Webhook WhatsApp
-│       ├── services/
-│       │   └── ia_vendedora.py   ← IA mock (reconhece intenções)
-│       └── utils/
-│           └── logger.py         ← Logger colorido ANSI
-│
-└── frontend/
-    ├── index.html
-    ├── package.json
-    ├── vite.config.js
-    ├── tailwind.config.js
-    ├── postcss.config.js
-    └── src/
-        ├── main.jsx              ← Entry point React
-        ├── App.jsx               ← Rotas da aplicação
-        ├── index.css             ← Tailwind + estilos globais
-        ├── assets/
-        ├── components/
-        │   ├── Layout.jsx        ← Sidebar + Topbar + Content
-        │   └── Sidebar.jsx       ← Navegação com ícones Lucide
-        ├── pages/
-        │   ├── Dashboard.jsx     ← Cards de resumo + gráfico
-        │   ├── Estoque.jsx       ← Tabela de produtos + CRUD
-        │   └── Caderneta.jsx     ← Clientes + detalhes de fiado
-        └── services/
-            └── api.js            ← Axios → FastAPI
-```
-
----
-
-## ⚙️ Variáveis de Ambiente
-
-O backend suporta configuração via arquivo `.env` na pasta `backend/`. Variáveis disponíveis:
-
-| Variável | Padrão | Descrição |
-|----------|--------|-----------|
-| `DATABASE_URL` | `sqlite:///solvetech.db` | URL de conexão do banco |
-| `WHATSAPP_VERIFY_TOKEN` | `solvetech-verify-token` | Token de verificação do webhook da Meta |
-| `OPENAI_API_KEY` | *(vazio)* | Chave da OpenAI — habilita a transcrição de áudios do WhatsApp |
-| `TRANSCRICAO_MODELO` | `whisper-1` | Modelo de transcrição de áudio da OpenAI |
-
-Exemplo de arquivo `backend/.env`:
-
-```env
-WHATSAPP_VERIFY_TOKEN=meu-token-secreto
-OPENAI_API_KEY=sk-...
-```
-
----
-
-## 📄 Licença
-
-Este projeto é um MVP educacional / protótipo. Licença a ser definida.
-
----
-
-<p align="center">
-  Feito com 💚 para o pequeno comerciante brasileiro
-</p>
+Support: [https://app.base44.com/support](https://app.base44.com/support)

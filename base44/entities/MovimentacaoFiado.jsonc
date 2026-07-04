@@ -1,0 +1,40 @@
+{
+  "name": "MovimentacaoFiado",
+  "type": "object",
+  "properties": {
+    "cliente_id": {
+      "type": "string",
+      "title": "Cliente"
+    },
+    "cliente_nome": {
+      "type": "string",
+      "title": "Nome do Cliente"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "compra",
+        "pagamento"
+      ],
+      "title": "Tipo"
+    },
+    "valor": {
+      "type": "number",
+      "title": "Valor"
+    },
+    "descricao": {
+      "type": "string",
+      "title": "Descri\u00e7\u00e3o"
+    },
+    "data": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Data"
+    }
+  },
+  "required": [
+    "cliente_id",
+    "tipo",
+    "valor"
+  ]
+}

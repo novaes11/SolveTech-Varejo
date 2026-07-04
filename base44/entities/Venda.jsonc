@@ -1,0 +1,48 @@
+{
+  "name": "Venda",
+  "type": "object",
+  "properties": {
+    "produto_id": {
+      "type": "string",
+      "title": "Produto"
+    },
+    "produto_nome": {
+      "type": "string",
+      "title": "Nome do Produto"
+    },
+    "quantidade": {
+      "type": "number",
+      "title": "Quantidade"
+    },
+    "preco_unitario": {
+      "type": "number",
+      "title": "Pre\u00e7o Unit\u00e1rio"
+    },
+    "custo_unitario": {
+      "type": "number",
+      "title": "Custo Unit\u00e1rio"
+    },
+    "total": {
+      "type": "number",
+      "title": "Total"
+    },
+    "lucro": {
+      "type": "number",
+      "title": "Lucro"
+    },
+    "descricao": {
+      "type": "string",
+      "title": "Descri\u00e7\u00e3o"
+    },
+    "data": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Data"
+    }
+  },
+  "required": [
+    "produto_id",
+    "quantidade",
+    "preco_unitario"
+  ]
+}

@@ -1,0 +1,35 @@
+{
+  "name": "Cliente",
+  "type": "object",
+  "properties": {
+    "nome": {
+      "type": "string",
+      "title": "Nome"
+    },
+    "telefone": {
+      "type": "string",
+      "title": "Telefone"
+    },
+    "limite_credito": {
+      "type": "number",
+      "title": "Limite de Cr\u00e9dito",
+      "default": 0
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "ativo",
+        "arquivado"
+      ],
+      "default": "ativo",
+      "title": "Status"
+    },
+    "observacoes": {
+      "type": "string",
+      "title": "Observa\u00e7\u00f5es"
+    }
+  },
+  "required": [
+    "nome"
+  ]
+}

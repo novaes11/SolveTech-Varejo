@@ -1,0 +1,40 @@
+{
+  "name": "MovimentacaoEstoque",
+  "type": "object",
+  "properties": {
+    "produto_id": {
+      "type": "string",
+      "title": "Produto"
+    },
+    "produto_nome": {
+      "type": "string",
+      "title": "Nome do Produto"
+    },
+    "tipo": {
+      "type": "string",
+      "enum": [
+        "entrada",
+        "saida"
+      ],
+      "title": "Tipo"
+    },
+    "quantidade": {
+      "type": "number",
+      "title": "Quantidade"
+    },
+    "motivo": {
+      "type": "string",
+      "title": "Motivo"
+    },
+    "data": {
+      "type": "string",
+      "format": "date-time",
+      "title": "Data"
+    }
+  },
+  "required": [
+    "produto_id",
+    "tipo",
+    "quantidade"
+  ]
+}
