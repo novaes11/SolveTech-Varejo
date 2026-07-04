@@ -6,10 +6,10 @@ import { LayoutDashboard, Package, BookUser, MessageCircle, BarChart3, LogOut, S
 import { initials } from '@/lib/format';
 
 const nav = [
+  { to: '/assistente', label: 'Assistente', icon: MessageCircle },
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
   { to: '/estoque', label: 'Estoque', icon: Package },
-  { to: '/caderneta', label: 'Caderneta', icon: BookUser },
-  { to: '/assistente', label: 'Assistente', icon: MessageCircle },
+  { to: '/caderneta', label: 'Clientes', icon: BookUser },
   { to: '/relatorios', label: 'Relatórios', icon: BarChart3 },
 ];
 

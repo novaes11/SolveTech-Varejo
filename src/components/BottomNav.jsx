@@ -5,8 +5,8 @@ import { LayoutDashboard, Package, BookUser, MessageCircle, BarChart3 } from 'lu
 const items = [
   { to: '/', label: 'Início', icon: LayoutDashboard, end: true },
   { to: '/estoque', label: 'Estoque', icon: Package },
-  { to: '/caderneta', label: 'Caderneta', icon: BookUser },
   { to: '/assistente', label: 'Assistente', icon: MessageCircle },
+  { to: '/caderneta', label: 'Clientes', icon: BookUser },
   { to: '/relatorios', label: 'Relatórios', icon: BarChart3 },
 ];
 

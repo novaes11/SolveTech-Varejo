@@ -1,0 +1,6 @@
+{
+  "name": "SolveTech-Varejo",
+  "site": {
+    "serveCommand": "npm run dev"
+  }
+}

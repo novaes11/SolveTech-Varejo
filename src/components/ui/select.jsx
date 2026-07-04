@@ -12,7 +12,12 @@ const SelectGroup = SelectPrimitive.Group
 
 const SelectValue = SelectPrimitive.Value
 
-const SelectTrigger = React.forwardRef(({ className, children, ...props }, ref) => (
+const SelectTrigger = React.forwardRef(
+  /**
+   * @param {React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>} props
+   * @param {React.Ref<React.ElementRef<typeof SelectPrimitive.Trigger>>} ref
+   */
+  ({ className, children, ...props }, ref) => (
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
@@ -49,7 +54,12 @@ const SelectScrollDownButton = React.forwardRef(({ className, ...props }, ref) =
 SelectScrollDownButton.displayName =
   SelectPrimitive.ScrollDownButton.displayName
 
-const SelectContent = React.forwardRef(({ className, children, position = "popper", ...props }, ref) => (
+const SelectContent = React.forwardRef(
+  /**
+   * @param {React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>} props
+   * @param {React.Ref<React.ElementRef<typeof SelectPrimitive.Content>>} ref
+   */
+  ({ className, children, position = "popper", ...props }, ref) => (
   <SelectPrimitive.Portal>
     <SelectPrimitive.Content
       ref={ref}
@@ -81,7 +91,12 @@ const SelectLabel = React.forwardRef(({ className, ...props }, ref) => (
 ))
 SelectLabel.displayName = SelectPrimitive.Label.displayName
 
-const SelectItem = React.forwardRef(({ className, children, ...props }, ref) => (
+const SelectItem = React.forwardRef(
+  /**
+   * @param {React.ComponentPropsWithoutRef<typeof SelectPrimitive.Item>} props
+   * @param {React.Ref<React.ElementRef<typeof SelectPrimitive.Item>>} ref
+   */
+  ({ className, children, ...props }, ref) => (
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
