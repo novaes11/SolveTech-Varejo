@@ -28,4 +28,9 @@ export const deletarCliente = (id) => api.delete(`/api/fiado/clientes/${id}`)
 export const getMovimentacoes = (clienteId) => api.get(`/api/fiado/movimentacoes/${clienteId}`)
 export const registrarFiado = (data) => api.post('/api/fiado/movimentacoes', data)
 
+// ─── Vendas ───────────────────────────────────────────────────────────────────
+
+export const getVendas = () => api.get('/api/vendas/')
+export const criarVenda = (data) => api.post('/api/vendas/', data)
+
 export default api

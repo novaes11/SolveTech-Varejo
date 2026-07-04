@@ -10,7 +10,7 @@ import {
   ResponsiveContainer,
   Legend,
 } from 'recharts'
-import { getProdutos, getClientes } from '../services/api'
+import { getProdutos, getClientes, getVendas } from '../services/api'
 
 // Dados mockados da semana pra popular o gráfico enquanto o backend
 // não tem endpoint de relatórios. Quando tiver, é só trocar o fetch.
@@ -57,6 +57,7 @@ export default function Dashboard() {
   const [totalProdutos, setTotalProdutos] = useState(0)
   const [totalEstoque, setTotalEstoque] = useState(0)
   const [totalClientes, setTotalClientes] = useState(0)
+  const [vendasIAHoje, setVendasIAHoje] = useState(0)
 
   useEffect(() => {
     // Puxa os dados reais do backend pra popular os cards
@@ -72,6 +73,18 @@ export default function Dashboard() {
 
     getClientes()
       .then(({ data }) => setTotalClientes(data.length))
+      .catch(() => {})
+
+    // Conta só as vendas de hoje que vieram da IA do WhatsApp
+    getVendas()
+      .then(({ data }) => {
+        const hoje = new Date().toDateString()
+        const daIA = data.filter((v) => {
+          const dataVenda = new Date(v.criado_em.endsWith('Z') ? v.criado_em : `${v.criado_em}Z`)
+          return v.origem === 'whatsapp' && dataVenda.toDateString() === hoje
+        })
+        setVendasIAHoje(daIA.length)
+      })
       .catch(() => {})
   }, [])
 
@@ -103,7 +116,7 @@ export default function Dashboard() {
         <CardResumo
           icon={Bot}
           titulo="Vendas da IA hoje"
-          valor="—"
+          valor={vendasIAHoje}
           cor="text-violet-600"
           bgCor="bg-violet-50"
         />

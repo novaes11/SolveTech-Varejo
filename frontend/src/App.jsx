@@ -3,6 +3,7 @@ import Layout from './components/Layout'
 import Dashboard from './pages/Dashboard'
 import Estoque from './pages/Estoque'
 import Caderneta from './pages/Caderneta'
+import Vendas from './pages/Vendas'
 
 export default function App() {
   return (
@@ -10,6 +11,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<Dashboard />} />
         <Route path="/estoque" element={<Estoque />} />
+        <Route path="/vendas" element={<Vendas />} />
         <Route path="/caderneta" element={<Caderneta />} />
       </Routes>
     </Layout>

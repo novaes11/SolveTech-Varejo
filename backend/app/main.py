@@ -7,8 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.database import engine, Base
-from app.models import Produto, Cliente, Fiado  # noqa: F401 — garante que os models são registrados
-from app.routers import estoque, fiado, whatsapp
+from app.models import Produto, Cliente, Fiado, Venda  # noqa: F401 — garante que os models são registrados
+from app.routers import estoque, fiado, vendas, whatsapp
 from app.utils.logger import get_logger, configurar_loggers_externos
 
 logger = get_logger(__name__)
@@ -71,6 +71,7 @@ async def log_requisicoes(request: Request, call_next):
 
 app.include_router(estoque.router)
 app.include_router(fiado.router)
+app.include_router(vendas.router)
 app.include_router(whatsapp.router)
 
 

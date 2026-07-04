@@ -39,6 +39,7 @@ O SolveTech Varejo é um MVP que resolve três dores do pequeno comerciante:
 | **Webhook WhatsApp** | Endpoint para receber/verificar webhooks da Meta (GET + POST) |
 | **IA Vendedora** | Serviço mock que reconhece intenções ("cardápio", "fiado") e responde com dados reais do banco |
 | **Transcrição de Áudio** | Mensagens de voz do WhatsApp são transcritas (OpenAI, pt-BR) e seguem o mesmo fluxo do texto |
+| **Venda por Voz** | "Vendi 2 pastéis pro Kenzo" (áudio ou texto) registra a venda, dá baixa no estoque e, com "fiado", anota na caderneta |
 | **Painel Admin** | Dashboard com gráficos, tela de estoque com busca e CRUD, caderneta com master-detail |
 | **Logging Colorido** | Logger customizado com cores ANSI para monitorar requisições, banco e IA no terminal |
 
@@ -233,6 +234,15 @@ npm run dev
 | `DELETE` | `/api/fiado/clientes/{id}` | Remover cliente |
 | `GET` | `/api/fiado/movimentacoes/{cliente_id}` | Histórico de movimentações |
 | `POST` | `/api/fiado/movimentacoes` | Registrar compra ou pagamento |
+
+### Vendas (`/api/vendas`)
+
+| Método | Rota | Descrição |
+|--------|------|-----------|
+| `GET` | `/api/vendas/` | Listar vendas (mais recentes primeiro) |
+| `POST` | `/api/vendas/` | Registrar venda (dá baixa no estoque) |
+
+> 🎤 Vendas também podem ser registradas **por voz ou texto no WhatsApp**: mande "vendi 2 pastéis pro Kenzo" que a IA entende quantidade, produto (com busca aproximada) e cliente. Falando "fiado", a compra também entra na caderneta do cliente.
 
 ### WhatsApp Webhook (`/api/whatsapp`)
 

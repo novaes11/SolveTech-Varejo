@@ -46,6 +46,10 @@ Dois apps independentes no mesmo repositório, sem monorepo tooling:
 
 O saldo devedor **não é armazenado** — é sempre calculado dinamicamente somando movimentações `compra` e subtraindo `pagamento` (função `_calcular_saldo`, duplicada em `routers/fiado.py` e `services/ia_vendedora.py`). Ao registrar uma compra, o backend valida o limite de fiado do cliente (`limite_fiado`) e rejeita com 400 se estourar. O cliente é identificado unicamente pelo **telefone**.
 
+### Vendas
+
+O model `Venda` guarda snapshot de nome/preço do produto e nome do cliente (FKs anuláveis), então o histórico sobrevive a exclusões. Toda venda (`POST /api/vendas/` ou por voz no WhatsApp) dá baixa no estoque na mesma transação. Vendas por voz nascem da intenção "vendi ..." em `ia_vendedora.py` (`_registrar_venda` + parsing em `_interpretar_venda`): entende quantidade por extenso, plural simplificado e busca aproximada de produto/cliente (sem acento + `difflib`). Essa intenção roda **antes** da checagem de cadastro do remetente, porque quem fala "vendi" é o comerciante. Com "fiado" na frase, também cria a movimentação na caderneta (validando o limite antes; nada é gravado se estourar).
+
 ### IA vendedora (mock intencional)
 
 `app/services/ia_vendedora.py` é um mock por palavras-chave ("cardápio", "fiado") que consulta o banco real. O ponto de troca por um LLM de verdade é a função `processar_mensagem(telefone, mensagem, db) -> str` — o webhook em `routers/whatsapp.py` só delega para ela. O POST do webhook aceita um payload simplificado (`{telefone, mensagem}` para texto; `tipo: "audio"` + `audio_url`/`audio_base64` para voz), não o formato real da Meta; o GET implementa a verificação padrão da Meta com `WHATSAPP_VERIFY_TOKEN`.

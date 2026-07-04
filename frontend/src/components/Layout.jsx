@@ -4,6 +4,7 @@ import Sidebar from './Sidebar'
 const titulos = {
   '/': 'Dashboard',
   '/estoque': 'Estoque',
+  '/vendas': 'Vendas',
   '/caderneta': 'Caderneta',
 }
 
