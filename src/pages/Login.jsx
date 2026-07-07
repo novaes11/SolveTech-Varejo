@@ -19,7 +19,12 @@ export default function Login() {
         setError("");
         setLoading(true);
         try {
-            await base44.auth.loginViaEmailPassword(email, password);
+            const result = await base44.auth.loginViaEmailPassword(email, password);
+            // Persiste o token no localStorage para o AuthContext reconhecer
+            if (result?.access_token) {
+                localStorage.setItem("base44_access_token", result.access_token);
+                base44.auth.setToken(result.access_token);
+            }
             window.location.href = "/";
         } catch (err) {
             setError(err.message || "E-mail ou senha inválidos.");
