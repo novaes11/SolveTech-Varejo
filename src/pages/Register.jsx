@@ -88,7 +88,22 @@ export default function Register() {
                 description: "Confira seu e-mail para o novo código.",
             });
         } catch (err) {
-            setError(err.message || "Não foi possível reenviar o código. Tente novamente.");
+            const msg = (err.message || "").toLowerCase();
+            // Se o OTP expirou ou o registro pendente não existe mais,
+            // refaz o registro para gerar um novo código
+            if (msg.includes("not found") || msg.includes("object not found")) {
+                try {
+                    await base44.auth.register({ email, password });
+                    toast({
+                        title: "Novo código enviado",
+                        description: "O código anterior expirou. Enviamos um novo para o seu e-mail.",
+                    });
+                } catch (retryErr) {
+                    setError(traduzErro(retryErr.message) || "Não foi possível reenviar o código. Tente novamente.");
+                }
+            } else {
+                setError(traduzErro(err.message) || "Não foi possível reenviar o código. Tente novamente.");
+            }
         }
     };
 
