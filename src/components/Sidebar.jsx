@@ -17,8 +17,12 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const { data: user } = useAsync(() => base44.auth.me().catch(() => null), [], { listen: false });
 
-  const handleLogout = async () => {
-    await base44.auth.logout('/');
+  const handleLogout = () => {
+    // Limpa tokens do localStorage
+    localStorage.removeItem('base44_access_token');
+    localStorage.removeItem('token');
+    // Redireciona para a tela de login local
+    window.location.href = '/login';
   };
 
   return (
